@@ -1,21 +1,8 @@
 <?php
 
-// connexion à la base de données
-function getPDOUser($host, $dbname, $login, $mdp): PDO {
-    try {
-        $db = new PDO("mysql:host=$host;dbname=$dbname", $login, $mdp);
-        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $db->exec("SET NAMES 'utf8'");
-    } catch (PDOException $e) {
-        echo "Erreur : " . $e->getMessage();
-        die();
-    }
-    return $db;
-}
-
 // vérification des identifiants
 function verifyCredentials($linkPDO, $email, $password) {
-    $query = $linkPDO->prepare("SELECT * FROM user WHERE email = ?");
+    $query = $linkPDO->prepare("SELECT * FROM User WHERE email = ?");
     $query->execute([$email]);
     $result = $query->fetch();
     if ($result && password_verify($password, $result['password'])) {
@@ -25,7 +12,7 @@ function verifyCredentials($linkPDO, $email, $password) {
 }
 
 // vérification du token
-function validerJWT() {
+function validerJWT() : string {
     $secret = 'secret';
     $token = get_bearer_token();
     error_log("Token: $token");
@@ -33,6 +20,7 @@ function validerJWT() {
         deliverResponse(401, 'Unauthorized');
         exit();
     }
+    return $token;
 }
 
 // envoi de la réponse

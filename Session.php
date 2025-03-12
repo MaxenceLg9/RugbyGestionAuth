@@ -1,6 +1,6 @@
 <?php
-function checkSession(): void
-{
+
+function checkSession(): void {
     session_start();
     if (empty($_SESSION['email'])) {
         header('Location: /login');
@@ -8,9 +8,9 @@ function checkSession(): void
         die();
     }
 }
-function destroySession(): void
-{
-    $_SESSION = [];
+
+function destroySession(): void {
+    // $_SESSION = [];
     session_destroy();
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
