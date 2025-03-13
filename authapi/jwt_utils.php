@@ -88,7 +88,12 @@ function encode($login,$id) : string {
 
 function refreshJwt($jwt) : string {
     $payload = getPayload($jwt);
-    return encode($payload["login"],$payload["id"]);
+    $payload['exp'] = time() + 3600; // Extend expiration time
+    $headers = [
+        'alg' => 'HS256',
+        'typ' => 'JWT'
+    ];
+    return generate_jwt($headers, $payload, 'secret');
 }
 
 function getPayload(string $token): array{

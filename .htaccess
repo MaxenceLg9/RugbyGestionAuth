@@ -5,3 +5,5 @@ RewriteCond %{REQUEST_FILENAME} !-d
 
 RewriteRule ^authapi$ authapi.php [L,QSA]
 RewriteRule ^login$ login.php [L,QSA]
+RewriteRule ^matches$ matches.php [L,QSA]
+RewriteRule ^joueurs$ joueurs.php [L,QSA]

@@ -1,23 +1,18 @@
 <?php
 
-// vérification des identifiants
-function verifyCredentials($linkPDO, $email, $password) {
-    $query = $linkPDO->prepare("SELECT * FROM User WHERE email = ?");
-    $query->execute([$email]);
-    $result = $query->fetch();
-    if ($result && password_verify($password, $result['password'])) {
-        return $result;
-    }
-    return false;
-}
+require_once 'jwt_utils.php';
 
 // vérification du token
 function validerJWT() : string {
     $secret = 'secret';
     $token = get_bearer_token();
     error_log("Token: $token");
-    if (!$token || !is_jwt_valid($token, $secret)) {
-        deliverResponse(401, 'Unauthorized');
+    if (!$token) {
+        deliverResponse(400, '[R401 REST AUTH] : Autorisation manquante');
+        exit();
+    }
+    if (!is_jwt_valid($token, $secret)) {
+        deliverResponse(401, '[R401 REST AUTH] : Token invalide');
         exit();
     }
     return $token;
