@@ -1,167 +1,98 @@
 <?php
 
-require_once 'Connexion.php';
+require_once '../authapi/functions.php';
+require_once '../authapi/jwt_utils.php';
 require_once '../modele/MatchDeRugby.php';
+require_once '../modele/Matches.php';
 
-class Matches {
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json');
 
-    /**
-     * @param mixed $row
-     * @return MatchDeRugby
-     * @throws DateMalformedStringException
-     */
-    public static function createMatch(mixed $row): MatchDeRugby {
-        $match = new MatchDeRugby($row['idMatch'], new DateTime($row['dateHeure']), $row['adversaire'],
-            Lieu::from($row['lieu']), $row['valider']);
-        if($row["resultat"] != null)
-            $match->setResultat(Resultat::from($row["resultat"]));
-        return $match;
-    }
-
-    public function create(MatchDeRugby $match): void {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare(
-                "INSERT INTO MatchDeRugby (dateHeure, adversaire, lieu, valider) 
-                   VALUES (:dateHeure, :adversaire, :lieu, 0)");
-
-            $dateHeure = $match->getDateHeure()->format('Y-m-d H:i:s');
-            $adversaire = $match->getAdversaire();
-            $lieu = $match->getLieu()->name;
-
-            $statement->bindParam(':dateHeure', $dateHeure);
-            $statement->bindParam(':adversaire', $adversaire);
-            $statement->bindParam(':lieu', $lieu);
-
-            $statement->execute();
-            echo "Match créé avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la création du match: " . $e->getMessage();
-        }
-    }
-
-    public static function read(): array {
-        $matches = [];
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM MatchDeRugby ORDER BY dateHeure");
-            $statement->execute();
-            while ($row = $statement->fetch()) {
-                $matches[] = self::createMatch($row);
+if (validerJWT()) {
+    switch ($_SERVER['REQUEST_METHOD']) {
+        // GET
+        case 'GET': 
+            if (isset($_GET['idMatch'])) {
+                $id = $_GET['idMatch'];
+                $match = Matches::readMatchById($id);
+                if ($match != null) {
+                    deliverResponse(200, 'OK donnees trouvees', $match);
+                } else {
+                    deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
+                }
+            } else {
+                $matches = Matches::readAllMatches();
+                if ($matches != null) {
+                    deliverResponse(200, 'OK donnees trouvees', $matches);
+                } else {
+                    deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
+                }
             }
-        } catch (Exception $e) {
-            echo "Erreur lors de la lecture des matches: " . $e->getMessage();
-        }
-        return $matches;
-    }
-
-    public static function readById(int $idMatch): ?MatchDeRugby {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM MatchDeRugby WHERE idMatch = :idMatch");
-            $statement->bindParam(':idMatch', $idMatch);
-            $statement->execute();
-            $row = $statement->fetch();
-            if ($row) {
-                return self::createMatch($row);
+            break;
+        // POST
+        case 'POST':
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!isset($data['dateHeure']) || !isset($data['adversaire']) || !isset($data['lieu'])) {
+                deliverResponse(400, '[R400 API REST] : Requête mal formée');
+                exit();
             }
-        } catch (Exception $e) {
-            echo "Erreur lors de la lecture du match: " . $e->getMessage();
-        }
-        return null;
-    }
-
-    public function readByDateHeure(DateTime $dateHeure): ?MatchDeRugby {
-        $dateHeure = $dateHeure->format('Y-m-d H:i:s');
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM MatchDeRugby WHERE dateHeure = :dateHeure");
-            $statement->bindParam(':dateHeure', $dateHeure);
-            $statement->execute();
-            $row = $statement->fetch();
-            if ($row) {
-                return self::createMatch($row);
+            $match = new MatchDeRugby(null, new DateTime($data['dateHeure']), $data['adversaire'], Lieu::from($data['lieu']), 0);
+            $idMatch = Matches::createMatch($match);
+            deliverResponse(201, 'Created', Matches::readMatchById($idMatch));
+            break;
+        // PUT
+        case 'PUT':
+            if (isset($_GET['idMatch'])) {
+                $id = $_GET['idMatch'];
+                $data = json_decode(file_get_contents('php://input'), true);
+                if (!isset($data['dateHeure']) || !isset($data['adversaire']) || !isset($data['lieu'])) {
+                    deliverResponse(400, '[R400 API REST] : Requête mal formée');
+                    exit();
+                }
+                $resultat = isset($data['resultat']) ? $data['resultat'] : null;
+                $valider = $resultat !== null ? true : false;
+                $match = new MatchDeRugby($id, 
+                                          new DateTime($data['dateHeure']), 
+                                          $data['adversaire'], 
+                                          Lieu::from($data['lieu']), 
+                                          $valider);
+                if ($resultat !== null) {
+                    $match->setResultat(Resultat::from($resultat));
+                }
+                Matches::updateMatch($match);
+                deliverResponse(200, 'OK', Matches::readMatchById($id));
+            } else {
+                deliverResponse(400, '[R400 API REST] : idMatch manquant');
             }
-        } catch (Exception $e) {
-            echo "Erreur lors de la lecture du match: " . $e->getMessage();
-        }
-        return null;
-    }
-
-    public function update(MatchDeRugby $match): void {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare(
-                "UPDATE MatchDeRugby SET dateHeure = :dateHeure, adversaire = :adversaire, lieu = :lieu
-                   WHERE idMatch = :idMatch");
-
-            $dateHeure = $match->getDateHeure()->format('Y-m-d H:i:s');
-            $adversaire = $match->getAdversaire();
-            $lieu = $match->getLieu()->name;
-            $id = $match->getidMatch();
-
-            $statement->bindParam(':dateHeure', $dateHeure);
-            $statement->bindParam(':adversaire', $adversaire);
-            $statement->bindParam(':lieu', $lieu);
-            $statement->bindParam(':idMatch',$id);
-
-            $statement->execute();
-            echo "Match mis à jour avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la mise à jour du match: " . $e->getMessage();
-            die();
-        }
-    }
-
-    public function delete(MatchDeRugby $matchDeRugby): void {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("DELETE FROM MatchDeRugby WHERE idMatch = :idMatch");
-            $id = $matchDeRugby->getIdMatch();
-            $statement->bindParam(':idMatch', $id);
-            $statement->execute();
-            $statement = $connexion->prepare("DELETE FROM Participer WHERE idMatch = :idMatch");
-            $statement->bindParam(':idMatch', $id);
-            $statement->execute();
-            echo "Match supprimé avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la suppression du match: " . $e->getMessage();
-        }
-    }
-
-    public function readMatchWithResultat(): array
-    {
-        $matches = [];
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM MatchDeRugby WHERE resultat is not null ORDER BY dateHeure");
-            $statement->execute();
-            while ($row = $statement->fetch()) {
-                $match = self::createMatch($row);
-                $matches[] = $match;
+            break;
+        // DELETE
+        case 'DELETE':
+            if (isset($_GET['idMatch'])) {
+                $id = $_GET['idMatch'];
+                $matchBD = Matches::readMatchById($id);
+                if ($matchBD != null) {
+                    // construire un objet MatchDeRugby
+                    $valider = $matchBD['resultat'] !== null ? true : false;
+                    $match = new MatchDeRugby($matchBD['idMatch'], 
+                                              new DateTime($matchBD['dateHeure']), 
+                                              $matchBD['adversaire'], 
+                                              Lieu::from($matchBD['lieu']), 
+                                              $valider);
+                    if ($matchBD['resultat'] !== null) {
+                        $match->setResultat(Resultat::from($matchBD['resultat']));
+                    }
+                    Matches::deleteMatch($match);
+                    deliverResponse(200, "Match avec id $id est supprime avec succes", $match);
+                } else {
+                    deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
+                }
+            } else {
+                deliverResponse(400, '[R400 API REST] : idMatch manquant');
             }
-        } catch (Exception $e) {
-            echo "Erreur lors de la lecture des matches: " . $e->getMessage();
-        }
-        return $matches;
+            break;
+        default:
+            deliverResponse(405, '[R405 API REST] : Methode connue mais non autorisee');
     }
-
-    public function validerMatch(MatchDeRugby $match): void
-    {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("UPDATE MatchDeRugby SET resultat = :resultat, valider := 1 WHERE idMatch = :idMatch");
-
-            $idMatch = $match->getIdMatch();
-            $resultat = $match->getResultat()->value;
-
-            $statement->bindParam(':idMatch', $idMatch);
-            $statement->bindParam(':resultat', $resultat);
-
-            $statement->execute();
-            echo "Match mis à jour avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la mise à jour du match: " . $e->getMessage();
-        }
-    }
+} else {
+    deliverResponse(401, '[R401 API REST] : Non autorisé');
 }
