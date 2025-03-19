@@ -1,194 +1,114 @@
 <?php
 
-require_once 'Connexion.php';
-require_once 'Statut.php';
-require_once 'Poste.php';
+require_once '../authapi/functions.php';
+require_once '../authapi/jwt_utils.php';
+require_once '../modele/Joueurs.php';
+require_once '../modele/Joueur.php';
 
-class Joueurs {
+header('Access-Control-Allow-Origin: *');
+header('Content-Type: application/json');
 
-    public function createJoueur(Joueur $joueur): void {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare(
-                "INSERT INTO Joueur (numeroLicense, nom, prenom, dateNaissance, taille, poids, statut, postePrefere, estPremiereLigne, commentaire) 
-                   VALUES (:numeroLicense, :nom, :prenom, :dateNaissance, :taille, :poids, :statut, :postePrefere, :estPremiereLigne, :commentaire)");
-
-            $this->bindParams($joueur, $statement);
-            $statement->execute();
-            echo "Joueur créé avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la création du joueur" . $e->getMessage();
-            die();
-        }
-    }
-
-    public static function readAllJoueursActifs(): array {
-        $joueurs = [];
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM Joueur WHERE statut = 'ACTIF' ORDER BY postePrefere, nom");
-            $statement->execute();
-            while ($row = $statement->fetch()) {
-                $joueurs[] = self::constructFromRow($row);
+if (validerJWT()) {
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            // recuperer l'id du joueur
+            if (isset($_GET['idJoueur'])) {
+                $id = $_GET['idJoueur'];
+                $joueur = Joueurs::readJoueurById($id);
+                if ($joueur != null) {
+                    deliverResponse(200, 'OK', $joueur);
+                } else {
+                    deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
+                }
+            } else {
+                $joueurs = Joueurs::readAllJoueurs();
+                if ($joueurs != null) {
+                    deliverResponse(200, 'OK', $joueurs);
+                } else {
+                    deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
+                }
             }
-        } catch (PDOException $e) {
-            echo "Erreur lors de la lecture des joueurs: " . $e->getMessage();
-        }
-        return $joueurs;
-    }
-
-    /**
-     * @throws DateMalformedStringException
-     */
-    public static function read(): array {
-        $joueurs = [];
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM Joueur ORDER BY postePrefere, nom");
-            $statement->execute();
-            while ($row = $statement->fetch()) {
-                $joueurs[] = self::constructFromRow($row);
+            break;
+        case 'POST':
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!isset($data['nom']) || !isset($data['prenom']) || 
+                !isset($data['dateNaissance']) || !isset($data['numeroLicense']) || 
+                !isset($data['taille']) || !isset($data['poids']) || 
+                !isset($data['statut']) || !isset($data['postePrefere']) || 
+                !isset($data['estPremiereLigne'])) {
+                deliverResponse(400, '[R400 API REST] : Requête mal formée');
+                exit();
             }
-        } catch (PDOException $e) {
-            echo "Erreur lors de la lecture des joueurs: " . $e->getMessage();
-        }
-        return $joueurs;
-    }
-
-    /**
-     * @throws DateMalformedStringException
-     */
-    public function readByNumeroLicense(int $numeroLicense): ?Joueur {
-        $joueur = null;
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM Joueur WHERE numeroLicense = :numeroLicense");
-            $statement->bindParam(':numeroLicense', $numeroLicense);
-            $statement->execute();
-            $row = $statement->fetch();
-            if ($row) {
-                $joueur = self::constructFromRow($row);
+            $joueur = new Joueur(null, 
+                                 $data['nom'], 
+                                 $data['prenom'], 
+                                 new DateTime($data['dateNaissance']),
+                                 $data['numeroLicense'], 
+                                 $data['taille'], 
+                                 $data['poids'],
+                                 Statut::tryFromName($data['statut']),
+                                 Poste::tryFromName($data['postePrefere']),
+                                 $data['estPremiereLigne']);
+            $idJoueur  = Joueurs::createJoueur($joueur);
+            deliverResponse(201, 'Created', Joueurs::readJoueurById($idJoueur));
+            break;
+        case 'PUT':
+            if (isset($_GET['idJoueur'])) {
+                $id = $_GET['idJoueur'];
+                $data = json_decode(file_get_contents('php://input'), true);
+                if (!isset($data['nom']) || !isset($data['prenom']) || 
+                    !isset($data['dateNaissance']) || !isset($data['numeroLicense']) || 
+                    !isset($data['taille']) || !isset($data['poids']) || 
+                    !isset($data['statut']) || !isset($data['postePrefere']) || 
+                    !isset($data['estPremiereLigne'])) {
+                    deliverResponse(400, '[R400 API REST] : Requête mal formée');
+                    exit();
+                }
+                $joueur = new Joueur($id, 
+                                     $data['nom'], 
+                                     $data['prenom'], 
+                                     new DateTime($data['dateNaissance']),
+                                     $data['numeroLicense'], 
+                                     $data['taille'], 
+                                     $data['poids'],
+                                     Statut::tryFromName($data['statut']),
+                                     Poste::tryFromName($data['postePrefere']),
+                                     $data['estPremiereLigne']);
+                Joueurs::updateJoueur($joueur);
+                deliverResponse(200, 'OK', Joueurs::readJoueurById($id));
+            } else {
+                deliverResponse(400, '[R400 API REST] : idJoueur manquant');
             }
-        } catch (PDOException $e) {
-            echo "Erreur lors de la lecture du joueur: " . $e->getMessage();
-        }
-        return $joueur;
-    }
-
-    /**
-     * @throws DateMalformedStringException
-     */
-    public static function readNonParticiperMatch(int $idMatch): array {
-        $joueurs = [];
-        try {
-            $connection = Connexion::getInstance()->getConnection();
-            $statement = $connection->prepare("SELECT * FROM Joueur WHERE idJoueur NOT IN (SELECT idJoueur FROM Participer WHERE idMatch = :idMatch)");
-            $statement->bindParam(':idMatch', $idMatch);
-            $statement->execute();
-            while ($row = $statement->fetch()) {
-                $joueurs[] = self::constructFromRow($row);
+            break;
+        case 'DELETE':
+            if (isset($_GET['idJoueur'])) {
+                $id = $_GET['idJoueur'];
+                $joueurBD = Joueurs::readJoueurById($id);
+                if ($joueurBD != null) {
+                    // construire un objet Joueur
+                    $joueur = new Joueur($joueurBD['idJoueur'], 
+                                         $joueurBD['nom'], 
+                                         $joueurBD['prenom'], 
+                                         new DateTime($joueurBD['dateNaissance']),
+                                         $joueurBD['numeroLicense'], 
+                                         $joueurBD['taille'], 
+                                         $joueurBD['poids'],
+                                         Statut::tryFromName($joueurBD['statut']),
+                                         Poste::tryFromName($joueurBD['postePrefere']),
+                                         $joueurBD['estPremiereLigne']);
+                    Joueurs::deleteJoueur($joueur);
+                    deliverResponse(200, "Joueur avec id $id est supprime avec succes", null);
+                } else {
+                    deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
+                }
+            } else {
+                deliverResponse(400, '[R400 API REST] : idJoueur manquant');
             }
-        }
-        catch (PDOException $e) {
-            echo "Erreur lors de la lecture des joueurs participant au match: " . $e->getMessage();
-        }
-        return $joueurs;
+            break;
+        default:
+            deliverResponse(405, '[R405 API REST] : Méthode connue mais non concernée');
     }
-
-    public function update(Joueur $joueur): void {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare(
-                "UPDATE Joueur SET taille = :taille, poids = :poids, statut = :statut,
-                    postePrefere = :postePrefere, estPremiereLigne = :estPremiereLigne,
-                    numeroLicense = :numeroLicense, nom = :nom, prenom = :prenom, dateNaissance = :dateNaissance, commentaire= :commentaire
-              WHERE idJoueur = :idJoueur"
-            );
-            self::bindParams($joueur, $statement);
-            $id = $joueur->getIdJoueur();
-            $statement->bindParam(':idJoueur', $id);
-
-            $statement->execute();
-            echo "Joueur mis à jour avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la mise à jour du joueur: " . $e->getMessage();
-        }
-    }
-
-    public function delete(Joueur $joueur): void {
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("DELETE FROM Joueur WHERE numeroLicense = :numeroLicense");
-            $numeroLicense = $joueur->getNumeroLicense();
-            $statement->bindParam(':numeroLicense', $numeroLicense);
-            $statement->execute();
-            echo "Joueur supprimé avec succès\n";
-        } catch (PDOException $e) {
-            echo "Erreur lors de la suppression du joueur: " . $e->getMessage();
-        }
-    }
-
-    /**
-     * @throws DateMalformedStringException
-     */
-    public static function readById(int $idJoueur): ?Joueur {
-        $joueur = null;
-        try {
-            $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("SELECT * FROM Joueur WHERE idJoueur = :idJoueur");
-            $statement->bindParam(':idJoueur', $idJoueur);
-            $statement->execute();
-            $row = $statement->fetch();
-            if ($row) {
-                $joueur = self::constructFromRow($row);
-            }
-        } catch (PDOException $e) {
-            echo "Erreur lors de la lecture du joueur: " . $e->getMessage();
-        }
-        return $joueur;
-    }
-
-    /**
-     * @throws DateMalformedStringException
-     */
-    private static function constructFromRow($row):Joueur{
-        $joueur = new Joueur($row['idJoueur'], $row['nom'], $row['prenom'],
-            new DateTime($row['dateNaissance']), $row['numeroLicense'], $row['taille'], $row['poids'],
-            Statut::from($row['statut']), Poste::tryFromName($row['postePrefere']), $row['estPremiereLigne']);
-        if(!is_null($row["commentaire"]))
-            $joueur->setCommentaire($row["commentaire"]);
-        if(!is_null($row["url"]))
-            $joueur->setURL($row["url"]);
-        return $joueur;
-    }
-
-    /**
-     * @param Joueur $joueur
-     * @param bool|PDOStatement $statement
-     * @return void
-     */
-    public function bindParams(Joueur $joueur, bool|PDOStatement $statement): void
-    {
-        $numeroLicense = $joueur->getNumeroLicense();
-        $nom = $joueur->getNom();
-        $prenom = $joueur->getPrenom();
-        $dateNaissance = $joueur->getDateNaissance()->format('Y-m-d');
-        $taille = $joueur->getTaille();
-        $poids = $joueur->getPoids();
-        $statut = $joueur->getStatut()->name;
-        $postePrefere = $joueur->getPostePrefere()->name;
-        $estPremiereLigne = $joueur->isPremiereLigne();
-        $commentaire = $joueur->getCommentaire();
-
-        $statement->bindParam(':numeroLicense', $numeroLicense);
-        $statement->bindParam(':nom', $nom);
-        $statement->bindParam(':prenom', $prenom);
-        $statement->bindParam(':dateNaissance', $dateNaissance);
-        $statement->bindParam(':taille', $taille);
-        $statement->bindParam(':poids', $poids);
-        $statement->bindParam(':statut', $statut);
-        $statement->bindParam(':postePrefere', $postePrefere);
-        $statement->bindParam(':estPremiereLigne', $estPremiereLigne);
-        $statement->bindParam(':commentaire', $commentaire);
-    }
+} else {
+    deliverResponse(401, '[R401 API REST AUTH] : Token invalide');
+    exit();
 }

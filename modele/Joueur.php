@@ -1,8 +1,7 @@
 <?php
 
-require_once '../modele/Statut.php';
-require_once '../db/DAOJoueur.php';
-require_once '../modele/Poste.php';
+require_once 'Statut.php';
+require_once 'Poste.php';
 
 class Joueur {
 
@@ -18,10 +17,9 @@ class Joueur {
     private bool $estPremiereLigne;
 
     private string $commentaire;
-
     private string $url;
 
-    public function  __construct(int $idJoueur, string $nom, string $prenom, DateTime $dateNaissance, int $numeroLicense, 
+    public function  __construct(?int $idJoueur, string $nom, string $prenom, DateTime $dateNaissance, int $numeroLicense, 
         int $taille, int $poids, Statut $statut, Poste $postePrefere, bool $estPremiereLigne) {
         $this->idJoueur = $idJoueur;
         $this->nom = $nom;

@@ -2,7 +2,7 @@
 
 require_once 'functions.php';
 require_once 'jwt_utils.php';
-require_once 'entraineur.php';
+require_once '../modele/Entraineur.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json');
