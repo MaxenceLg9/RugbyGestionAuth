@@ -1,35 +1,16 @@
 <?php
 
 require_once '../modele/Connexion.php';
-require_once '../modele/MatchDeRugby.php';
+require_once '../modele/Lieu.php';
+require_once '../modele/Resultat.php';
 
-class Matches {
+class Match {
 
-    /**
-     * @param mixed $row
-     * @return MatchDeRugby
-     * @throws DateMalformedStringException
-     */
-    public static function createMatchObject(mixed $row): MatchDeRugby {
-        $match = new MatchDeRugby($row['idMatch'], new DateTime($row['dateHeure']), $row['adversaire'],
-            Lieu::from($row['lieu']), $row['valider']);
-        if($row["resultat"] != null)
-            $match->setResultat(Resultat::from($row["resultat"]));
-        return $match;
-    }
-
-    public static function createMatch(MatchDeRugby $match): int {
+    public static function createMatch(array $match): int {
         try {
             $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("INSERT INTO MatchDeRugby (dateHeure, adversaire, lieu, valider) 
-                                              VALUES (:dateHeure, :adversaire, :lieu, 0)");
-            $dateHeure = $match->getDateHeure()->format('Y-m-d H:i:s');
-            $adversaire = $match->getAdversaire();
-            $lieu = $match->getLieu()->name;
-            $statement->bindParam(':dateHeure', $dateHeure);
-            $statement->bindParam(':adversaire', $adversaire);
-            $statement->bindParam(':lieu', $lieu);
-            $statement->execute();
+            $statement = $connexion->prepare("INSERT INTO MatchDeRugby (dateHeure, adversaire, lieu, valider) VALUES (?, ?, ?, 0)");
+            $statement->execute([$match['dateHeure']->format('Y-m-d H:i:s'), $match['adversaire'], $match['lieu']->name]);
             return $connexion->lastInsertId();
         } catch (PDOException $e) {
             echo "Erreur lors de la création du match: " . $e->getMessage();
@@ -83,43 +64,28 @@ class Matches {
         return null;
     }
 
-    public static function updateMatch(MatchDeRugby $match): void {
+    public static function updateMatch(array $match): void {
         try {
             $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("UPDATE MatchDeRugby SET dateHeure = :dateHeure, adversaire = :adversaire, 
-                                              lieu = :lieu, resultat = :resultat, valider = :valider WHERE idMatch = :idMatch");
-
-            $dateHeure = $match->getDateHeure()->format('Y-m-d H:i:s');
-            $adversaire = $match->getAdversaire();
-            $lieu = $match->getLieu()->name;
-            $resultat = $match->getResultat()->value;
-            $valider = $match->isValider();
-            $id = $match->getidMatch();
-
-            $statement->bindParam(':dateHeure', $dateHeure);
-            $statement->bindParam(':adversaire', $adversaire);
-            $statement->bindParam(':lieu', $lieu);
-            $statement->bindParam(':resultat', $resultat);
-            $statement->bindParam(':valider', $valider);
-            $statement->bindParam(':idMatch',$id);
-
-            $statement->execute();
+            $statement = $connexion->prepare("UPDATE MatchDeRugby 
+                                              SET dateHeure = ?, adversaire = ?, lieu = ?, resultat = ?, valider = ? 
+                                              WHERE idMatch = ?");
+            $statement->execute([$match['dateHeure']->format('Y-m-d H:i:s'), 
+                                 $match['adversaire'], $match['lieu']->name, 
+                                 $match['resultat'], $match['valider'], $match['idMatch']]);
         } catch (PDOException $e) {
             echo "Erreur lors de la mise à jour du match: " . $e->getMessage();
             die();
         }
     }
 
-    public static function deleteMatch(MatchDeRugby $matchDeRugby): void {
+    public static function deleteMatch(int $idMatch): void {
         try {
             $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("DELETE FROM MatchDeRugby WHERE idMatch = :idMatch");
-            $id = $matchDeRugby->getIdMatch();
-            $statement->bindParam(':idMatch', $id);
-            $statement->execute();
-            $statement = $connexion->prepare("DELETE FROM Participer WHERE idMatch = :idMatch");
-            $statement->bindParam(':idMatch', $id);
-            $statement->execute();
+            $statement = $connexion->prepare("DELETE FROM Participer WHERE idMatch = ?");
+            $statement->execute([$idMatch]);
+            $statement = $connexion->prepare("DELETE FROM MatchDeRugby WHERE idMatch = ?");
+            $statement->execute([$idMatch]);
         } catch (PDOException $e) {
             echo "Erreur lors de la suppression du match: " . $e->getMessage();
         }
@@ -141,18 +107,11 @@ class Matches {
         return $matches;
     }
 
-    public function validerMatch(MatchDeRugby $match): void {
+    public function validerMatch(array $match): void {
         try {
             $connexion = Connexion::getInstance()->getConnection();
-            $statement = $connexion->prepare("UPDATE MatchDeRugby SET resultat = :resultat, valider := 1 WHERE idMatch = :idMatch");
-
-            $idMatch = $match->getIdMatch();
-            $resultat = $match->getResultat()->value;
-
-            $statement->bindParam(':idMatch', $idMatch);
-            $statement->bindParam(':resultat', $resultat);
-
-            $statement->execute();
+            $statement = $connexion->prepare("UPDATE MatchDeRugby SET resultat = ?, valider := 1 WHERE idMatch = ?");
+            $statement->execute([$match['resultat'], $match['idMatch']]);
             echo "Match mis à jour avec succès\n";
         } catch (PDOException $e) {
             echo "Erreur lors de la mise à jour du match: " . $e->getMessage();

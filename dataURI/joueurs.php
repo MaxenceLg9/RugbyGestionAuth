@@ -2,7 +2,6 @@
 
 require_once '../authapi/functions.php';
 require_once '../authapi/jwt_utils.php';
-require_once '../modele/Joueurs.php';
 require_once '../modele/Joueur.php';
 
 header('Access-Control-Allow-Origin: *');
@@ -14,14 +13,14 @@ if (validerJWT()) {
             // recuperer l'id du joueur
             if (isset($_GET['idJoueur'])) {
                 $id = $_GET['idJoueur'];
-                $joueur = Joueurs::readJoueurById($id);
+                $joueur = Joueur::readJoueurById($id);
                 if ($joueur != null) {
                     deliverResponse(200, 'OK', $joueur);
                 } else {
                     deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
                 }
             } else {
-                $joueurs = Joueurs::readAllJoueurs();
+                $joueurs = Joueur::readAllJoueurs();
                 if ($joueurs != null) {
                     deliverResponse(200, 'OK', $joueurs);
                 } else {
@@ -39,18 +38,8 @@ if (validerJWT()) {
                 deliverResponse(400, '[R400 API REST] : Requête mal formée');
                 exit();
             }
-            $joueur = new Joueur(null, 
-                                 $data['nom'], 
-                                 $data['prenom'], 
-                                 new DateTime($data['dateNaissance']),
-                                 $data['numeroLicense'], 
-                                 $data['taille'], 
-                                 $data['poids'],
-                                 Statut::tryFromName($data['statut']),
-                                 Poste::tryFromName($data['postePrefere']),
-                                 $data['estPremiereLigne']);
-            $idJoueur  = Joueurs::createJoueur($joueur);
-            deliverResponse(201, 'Created', Joueurs::readJoueurById($idJoueur));
+            $idJoueur  = Joueur::createJoueur($data);
+            deliverResponse(201, "Joueur with id = $idJoueur created", Joueur::readJoueurById($idJoueur));
             break;
         case 'PUT':
             if (isset($_GET['idJoueur'])) {
@@ -64,18 +53,8 @@ if (validerJWT()) {
                     deliverResponse(400, '[R400 API REST] : Requête mal formée');
                     exit();
                 }
-                $joueur = new Joueur($id, 
-                                     $data['nom'], 
-                                     $data['prenom'], 
-                                     new DateTime($data['dateNaissance']),
-                                     $data['numeroLicense'], 
-                                     $data['taille'], 
-                                     $data['poids'],
-                                     Statut::tryFromName($data['statut']),
-                                     Poste::tryFromName($data['postePrefere']),
-                                     $data['estPremiereLigne']);
-                Joueurs::updateJoueur($joueur);
-                deliverResponse(200, 'OK', Joueurs::readJoueurById($id));
+                Joueur::updateJoueur($data);
+                deliverResponse(200, "Joueur with id = $id updated", Joueur::readJoueurById($id));
             } else {
                 deliverResponse(400, '[R400 API REST] : idJoueur manquant');
             }
@@ -83,21 +62,10 @@ if (validerJWT()) {
         case 'DELETE':
             if (isset($_GET['idJoueur'])) {
                 $id = $_GET['idJoueur'];
-                $joueurBD = Joueurs::readJoueurById($id);
+                $joueurBD = Joueur::readJoueurById($id);
                 if ($joueurBD != null) {
-                    // construire un objet Joueur
-                    $joueur = new Joueur($joueurBD['idJoueur'], 
-                                         $joueurBD['nom'], 
-                                         $joueurBD['prenom'], 
-                                         new DateTime($joueurBD['dateNaissance']),
-                                         $joueurBD['numeroLicense'], 
-                                         $joueurBD['taille'], 
-                                         $joueurBD['poids'],
-                                         Statut::tryFromName($joueurBD['statut']),
-                                         Poste::tryFromName($joueurBD['postePrefere']),
-                                         $joueurBD['estPremiereLigne']);
-                    Joueurs::deleteJoueur($joueur);
-                    deliverResponse(200, "Joueur avec id $id est supprime avec succes", null);
+                    Joueur::deleteJoueur($joueurBD['numeroLicense']);
+                    deliverResponse(200, "Joueur avec id $id deleted", null);
                 } else {
                     deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
                 }
