@@ -2,7 +2,7 @@
 
 require_once '../authapi/functions.php';
 require_once '../authapi/jwt_utils.php';
-require_once '../modele/Match.php';
+require_once '../modele/MatchDeRugby.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json');
@@ -13,14 +13,14 @@ if (validerJWT()) {
         case 'GET': 
             if (isset($_GET['idMatch'])) {
                 $id = $_GET['idMatch'];
-                $match = Match::readMatchById($id);
+                $match = MatchDeRugby::readMatchById($id);
                 if ($match != null) {
                     deliverResponse(200, 'OK donnees trouvees', $match);
                 } else {
                     deliverResponse(404, '[R404 API REST] : Ressource non trouvée');
                 }
             } else {
-                $matches = Match::readAllMatches();
+                $matches = MatchDeRugby::readAllMatches();
                 if ($matches != null) {
                     deliverResponse(200, 'OK donnees trouvees', $matches);
                 } else {
@@ -35,8 +35,8 @@ if (validerJWT()) {
                 deliverResponse(400, '[R400 API REST] : Requête mal formée');
                 exit();
             }
-            $idMatch = Match::createMatch($match);
-            deliverResponse(201, 'Created', Match::readMatchById($idMatch));
+            $idMatch = MatchDeRugby::createMatch($match);
+            deliverResponse(201, 'Created', MatchDeRugby::readMatchById($idMatch));
             break;
         // PUT
         case 'PUT':
@@ -47,8 +47,8 @@ if (validerJWT()) {
                     deliverResponse(400, '[R400 API REST] : Requête mal formée');
                     exit();
                 }
-                Match::updateMatch($data);
-                deliverResponse(200, 'OK', Match::readMatchById($id));
+                MatchDeRugby::updateMatch($data);
+                deliverResponse(200, 'OK', MatchDeRugby::readMatchById($id));
             } else {
                 deliverResponse(400, '[R400 API REST] : idMatch manquant');
             }
@@ -57,9 +57,9 @@ if (validerJWT()) {
         case 'DELETE':
             if (isset($_GET['idMatch'])) {
                 $id = $_GET['idMatch'];
-                $match = Match::readMatchById($id);
+                $match = MatchDeRugby::readMatchById($id);
                 if ($match != null) {
-                    Match::deleteMatch($id);
+                    MatchDeRugby::deleteMatch($id);
                     deliverResponse(200, "Match avec id $id est supprime avec succes", null);
                 } else {
                     deliverResponse(404, '[R404 API REST] : Ressource non trouvée');

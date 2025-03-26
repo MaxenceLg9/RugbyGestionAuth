@@ -4,7 +4,7 @@ require_once '../modele/Connexion.php';
 require_once '../modele/Lieu.php';
 require_once '../modele/Resultat.php';
 
-class Match {
+class MatchDeRugby {
 
     public static function createMatch(array $match): int {
         try {
