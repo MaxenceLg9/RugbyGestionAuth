@@ -1,11 +1,25 @@
 <?php
 
+require_once './authapi/jwt_utils.php';
+
 function checkSession(): void {
     session_start();
     if (empty($_SESSION['email'])) {
         header('Location: /login');
         destroySession();
         die();
+    }
+
+    // Check and refresh JWT token
+    if (isset($_SESSION['token'])) {
+        $newToken = refreshJwt($_SESSION['token']);
+        if ($newToken) {
+            $_SESSION['token'] = $newToken;
+        } else {
+            header('Location: /login');
+            destroySession();
+            die();
+        }
     }
 }
 

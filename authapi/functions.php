@@ -19,7 +19,7 @@ function validerJWT() : string {
 }
 
 // envoi de la réponse
-function deliverResponse($status_code, $status_message, $data = null) {
+function deliverResponse($status_code, $status_message, $data = null, $headers = []) {
     // Paramétrage de l'entête HTTP
     http_response_code($status_code);
     // Utilise un message standardisé en fonction du code HTTP
@@ -28,6 +28,9 @@ function deliverResponse($status_code, $status_message, $data = null) {
     header("Content-Type:application/json; charset=utf-8");
     // Indique au client le format de la réponse
     header("Access-Control-Allow-Origin: *"); // permet l'acces depuis n'importe quel domaine
+    foreach ($headers as $header => $value) {
+        header("$header: $value");
+    }
     $response['status_code'] = $status_code;
     $response['status_message'] = $status_message;
     $response['data'] = $data;

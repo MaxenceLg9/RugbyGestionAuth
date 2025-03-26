@@ -16,14 +16,8 @@ if ($requestBody === null) {
 
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'POST': 
-        if (!array_key_exists('email', $requestBody) || !array_key_exists('motDePasse', $requestBody)) {
+        if (!isset($requestBody['email']) || !isset($requestBody['motDePasse'])) {
             deliverResponse(400, '[R401 API REST AUTH] : Paramètres manquants');
-        } elseif (array_key_exists('token', $requestBody)) {
-            if (is_jwt_valid($requestBody['token'], 'secret')) {
-                deliverResponse(200, '[R401 REST AUTH] : Token valide', $requestBody['token']);
-            } else {
-                deliverResponse(400, '[R401 REST AUTH] : Token invalide');
-            }
         } else {
             $user = Entraineur::verifyCredentials($requestBody['email'], $requestBody['motDePasse']);
             if ($user) {
@@ -33,32 +27,55 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 ];
                 $payload = [
                     'email' => $user['email'],
-                    'exp' => time() + 3600
+                    'exp' => time() + 3600 // 1 hour expiration
                 ];
-                $jwt = generate_jwt($headers, $payload, 'secret');
-                deliverResponse(200, '[R401 REST AUTH] : Authentification OK', $jwt);
+                $token = generate_jwt($headers, $payload, 'secret');
+
+                // Generate refresh token
+                $refreshPayload = [
+                    'email' => $user['email'],
+                    'exp' => time() + (7 * 24 * 3600) // 7 days expiration
+                ];
+                $refreshToken = generate_jwt($headers, $refreshPayload, 'secret');
+
+                // Store refresh token securely (e.g., in a database)
+                // For simplicity, we'll just return it in the response
+                deliverResponse(200, '[R401 REST AUTH] : Authentification OK', ['token' => $token, 'refreshToken' => $refreshToken]);
             } else {
                 deliverResponse(400, '[R401 API REST AUTH] : login et/ou mot de passe incorrect');
             }
         }
         break;
     case 'PUT':
-        if (array_key_exists('token', $requestBody)) {
-            if (is_jwt_valid($requestBody['token'], 'secret')) {
-                deliverResponse(200, '[R401 REST AUTH] : Token valide', refreshJwt($requestBody['token']));
+        if (isset($requestBody['refreshToken'])) {
+            if (is_jwt_valid($requestBody['refreshToken'], 'secret')) {
+                $payload = getPayload($requestBody['refreshToken']);
+                $newPayload = [
+                    'email' => $payload['email'],
+                    'exp' => time() + 3600 // 1 hour expiration
+                ];
+                $newJwt = generate_jwt(['alg' => 'HS256', 'typ' => 'JWT'], $newPayload, 'secret');
+                deliverResponse(200, '[R401 REST AUTH] : Token valide', $newJwt, ['Authorization' => "Bearer $newJwt"]);
             } else {
-                deliverResponse(400, '[R401 REST AUTH] : Token invalide');
+                deliverResponse(400, '[R401 REST AUTH] : Refresh token invalide');
             }
         } else {
             deliverResponse(400, '[R401 REST AUTH] : Paramètres manquants');
         }
         break;
     case 'GET':
-        if (array_key_exists('token', $_GET)) {
-            if (is_jwt_valid($_GET['token'], 'secret')) {
-                deliverResponse(200, '[R401 REST AUTH] : Token valide', refreshJwt($_GET['token']));
+        if (isset($_GET['refreshToken'])) {
+            $refreshToken = $_GET['refreshToken'];
+            if (is_jwt_valid($refreshToken, 'secret')) {
+                $payload = getPayload($refreshToken);
+                $newPayload = [
+                    'email' => $payload['email'],
+                    'exp' => time() + 3600 // 1 hour expiration
+                ];
+                $newJwt = generate_jwt(['alg' => 'HS256', 'typ' => 'JWT'], $newPayload, 'secret');
+                deliverResponse(200, '[R401 REST AUTH] : Token valide', ['token' => $newJwt]);
             } else {
-                deliverResponse(400, '[R401 REST AUTH] : Token invalide');
+                deliverResponse(400, '[R401 REST AUTH] : Refresh token invalide');
             }
         } else {
             deliverResponse(400, '[R401 REST AUTH] : Paramètres manquants');
