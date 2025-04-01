@@ -2,49 +2,7 @@
 
 namespace Token {
 
-    use function Users\getUser;
-
-    function apiVerifyToken(): bool {
-        $token = get_bearer_token() ?? "";
-        $url = "messup.app/api/auth/";
-        $data = json_encode([
-            "token" => $token
-        ]);
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);  // This will follow redirects
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-//        echo $response;
-        return json_decode($response, true)["valid"];
-    }
-
-    function apiReloadToken(): string {
-        $token = get_bearer_token() ?? "";
-        $url = "messup.app/api/auth/";
-        $data = json_encode([
-            "token" => $token
-        ]);
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT"); // Correct way to use PUT with a request body
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-        return json_decode($response, true)["token"];
-    }
+    use function Entraineur\getEntraineur;
 
 
     function generate_jwt($headers, $payload, $secret): string {
@@ -138,7 +96,7 @@ namespace Token {
 
     function is_valid_token($jwt): bool {
         if(is_jwt_valid($jwt, "bar-mitzvah"))
-            if(getUser(getPayload($jwt)["id"]) != [])
+            if(getEntraineur(getPayload($jwt)["id"]) != [])
                 return true;
         return false;
     }

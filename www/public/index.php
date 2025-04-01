@@ -1,11 +1,9 @@
 <?php
 
 require_once "{$_SERVER["DOCUMENT_ROOT"]}/../libs/modele/Token.php";
-require_once "{$_SERVER["DOCUMENT_ROOT"]}/../libs/modele/Users.php";
+require_once "{$_SERVER["DOCUMENT_ROOT"]}/../libs/modele/Entraineur.php";
 
-use function Users\checkUser;
-use function Users\newUser;
-use function Users\getUserByUsername;
+use function Entraineur\checkEntraineur,Entraineur\getEntraineurByEmail,Entraineur\newEntraineur;
 use function Token\encode,Token\is_valid_token,Token\refreshJwt;
 
 header('Access-Control-Allow-Origin: *');
@@ -13,21 +11,32 @@ header('Content-Type: application/json');
 
 $jsonBody = json_decode(file_get_contents("php://input"), true);
 
+function checkRegister(array $jsonBody): bool {
+    return isset($jsonBody["nom"]) &&
+        isset($jsonBody["prenom"]) &&
+        isset($jsonBody["equipe"]) &&
+        isset($jsonBody["confirmpassword"]);
+}
+
+function checkLogin(array $jsonBody): bool {
+    return isset($jsonBody["email"]) &&
+        isset($jsonBody["password"]);
+}
 
 //send only data
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     //login and password defined => creating the token
-    if (isset($jsonBody["username"]) && isset($jsonBody["password"])) {
+    if (is_array($jsonBody) && checkLogin($jsonBody)) {
         //create user
-        if(isset($jsonBody["confirmpassword"])){
+        if(checkRegister($jsonBody)){
             if($jsonBody["password"] != $jsonBody["confirmpassword"]){
                 $response = array("response" => "Passwords do not match", "status" => 400);
             }
             else{
-                $user = getUserByUsername($jsonBody["username"]);
+                $user = getEntraineurByEmail($jsonBody["email"]);
                 if (!empty($user)) {
                     $response = array("response" => "Username déjà pris", "status" => 400);
-                } else if(empty(newUser($jsonBody["username"], $jsonBody["password"]))){
+                } else if(empty(newEntraineur($jsonBody))){
                     $response = array("response" => "Erreur lors de la création de l'utilisateur", "status" => 400);
                 } else {
                     $response = array("response" => "OK", "status" => 200);
@@ -36,12 +45,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         else {
             //check validity/truth of the login credentials
-            $user = checkUser($jsonBody["username"], $jsonBody["password"]);
+            $user = checkEntraineur($jsonBody["email"], $jsonBody["password"]);
             if (empty($user)) {
                 $response = array("response" => "Invalid login or password", "status" => 400);
             } else {
                 //generate the response and so the token
-                $token = encode($user["username"], $user["idUser"]);
+                $token = encode($user["email"], $user["idEntraineur"]);
                 setcookie("token",$token,time() + 1800,"/");
                 $response = array("response" => "OK", "status" => 200, "token" => $token);
             }
@@ -52,7 +61,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $response = array("response" => "OK", "status" => 200,"valid"=> is_valid_token($jsonBody["token"]));
     //default case
     else {
-        $response = array("response" => "Please provide a token", "status" => 400);
+        $response = array("response" => "Please provide a proper data", "status" => 400);
     }
 }
 //update the token (refresh exp time)
