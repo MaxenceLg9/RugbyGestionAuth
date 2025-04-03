@@ -6,8 +6,11 @@ require_once "{$_SERVER["DOCUMENT_ROOT"]}/../libs/modele/Entraineur.php";
 use function Entraineur\checkEntraineur,Entraineur\getEntraineurByEmail,Entraineur\newEntraineur;
 use function Token\encode,Token\is_valid_token,Token\refreshJwt;
 
-header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json');
+header('Cross-Origin-Resource-Policy: *');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 $jsonBody = json_decode(file_get_contents("php://input"), true);
 
@@ -23,6 +26,11 @@ function checkLogin(array $jsonBody): bool {
         isset($jsonBody["password"]);
 }
 
+function checkAPIToken(): bool
+{
+    return isset(apache_request_headers()["API_TOKEN"]) &&
+        password_verify(apache_request_headers()["API_TOKEN"],"");
+}
 //send only data
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     //login and password defined => creating the token
@@ -30,16 +38,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         //create user
         if(checkRegister($jsonBody)){
             if($jsonBody["password"] != $jsonBody["confirmpassword"]){
-                $response = array("response" => "Passwords do not match", "status" => 400);
+                $message = array("response" => "Passwords do not match", "status" => 400);
             }
             else{
                 $user = getEntraineurByEmail($jsonBody["email"]);
                 if (!empty($user)) {
-                    $response = array("response" => "Username déjà pris", "status" => 400);
+                    $message = array("response" => "Username déjà pris", "status" => 400);
                 } else if(empty(newEntraineur($jsonBody))){
-                    $response = array("response" => "Erreur lors de la création de l'utilisateur", "status" => 400);
+                    $message = array("response" => "Erreur lors de la création de l'utilisateur", "status" => 400);
                 } else {
-                    $response = array("response" => "OK", "status" => 200);
+                    $message = array("response" => "OK", "status" => 200);
                 }
             }
         }
@@ -47,34 +55,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             //check validity/truth of the login credentials
             $user = checkEntraineur($jsonBody["email"], $jsonBody["password"]);
             if (empty($user)) {
-                $response = array("response" => "Invalid login or password", "status" => 400);
+                $message = array("response" => "Invalid login or password", "status" => 400);
             } else {
+
                 //generate the response and so the token
                 $token = encode($user["email"], $user["idEntraineur"]);
                 setcookie("token",$token,time() + 1800,"/");
-                $response = array("response" => "OK", "status" => 200, "token" => $token);
+                $message = array("response" => "OK", "status" => 200, "token" => $token);
             }
         }
     }
     //the case to check the token authenticity
-    elseif(isset($jsonBody["token"])) //valid or not
-        $response = array("response" => "OK", "status" => 200,"valid"=> is_valid_token($jsonBody["token"]));
+    elseif(isset($jsonBody["token"]) && checkAPIToken()) //valid or not
+        $message = array("response" => "OK", "status" => 200,"valid"=> is_valid_token($jsonBody["token"]));
     //default case
     else {
-        $response = array("response" => "Please provide a proper data", "status" => 400);
+        $message = array("response" => "Please provide a proper data", "status" => 400);
     }
 }
 //update the token (refresh exp time)
 elseif($_SERVER["REQUEST_METHOD"] == "PUT") {
     //if valid, refreshing token
-    if(is_valid_token($jsonBody["token"])){
-        $response = array("response" => "OK", "status" => 200, "token" => refreshJwt($jsonBody["token"]));
+    if(is_valid_token($jsonBody["token"]) && checkAPIToken()){
+        $message = array("response" => "OK", "status" => 200, "token" => refreshJwt($jsonBody["token"]));
     }else{
-        $response = array("response" => "Token is invalid", "status" => 405, "token"=>"");
+        $message = array("response" => "Token is invalid", "status" => 405, "token"=>"");
     }
 }
-else{
-    $response = array("response" => "Unsupported method", "status" => 400, "token" => "");
+else if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    $message = array("status" => 200, "response" => "Options ok","data" => []);
 }
-http_response_code($response["status"]);
-echo json_encode($response);
+else{
+    $message = array("response" => "Unsupported method", "status" => 400, "token" => "");
+}
+http_response_code($message["status"]);
+echo json_encode($message);
