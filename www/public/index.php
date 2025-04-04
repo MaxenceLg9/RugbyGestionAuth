@@ -29,7 +29,7 @@ function checkLogin(array $jsonBody): bool {
 function checkAPIToken(): bool
 {
     return isset(apache_request_headers()["API_TOKEN"]) &&
-        password_verify(apache_request_headers()["API_TOKEN"],"");
+        password_verify(apache_request_headers()["API_TOKEN"],"$2y$10\$fJ4aB.yt.s5zb0x7ylj9aOabLB34yVKiJ1/XeU3obLFbaQ1bgh076");
 }
 //send only data
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
