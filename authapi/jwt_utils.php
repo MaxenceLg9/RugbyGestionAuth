@@ -13,7 +13,8 @@ function generate_jwt($headers, $payload, $secret) {
 	return $jwt;
 }
 
-function is_jwt_valid($jwt, $secret) {
+function is_jwt_valid($jwt, $secret): bool
+{
 	// split the jwt
 	$tokenParts = explode('.', $jwt);
 	//print_r($tokenParts);
