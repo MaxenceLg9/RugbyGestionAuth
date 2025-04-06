@@ -42,7 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             else{
                 if (existEntraineur()) {
-                    $message = array("response" => "Un utilisateur existe déjà", "status" => 400);
+                    $message = array("response" => "Un utilisateur existe déjà", "status" => 405);
                 } else if(empty(newEntraineur($jsonBody))){
                     $message = array("response" => "Erreur lors de la création de l'utilisateur", "status" => 400);
                 } else {
@@ -54,9 +54,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             //check validity/truth of the login credentials
             $user = checkEntraineur($jsonBody["email"], $jsonBody["password"]);
             if (empty($user)) {
-                $message = array("response" => "Invalid login or password", "status" => 400);
+                $message = array("response" => "Invalid login or password", "status" => 400, "token" => "");
             } else {
-
                 //generate the response and so the token
                 $token = encode($user["email"], $user["idEntraineur"]);
                 $message = array("response" => "OK", "status" => 200, "token" => $token);
@@ -82,7 +81,6 @@ elseif($_SERVER["REQUEST_METHOD"] == "PUT") {
         }
     }
     else {
-        var_dump($jsonBody);
         $message = array("response" => "Please provide a proper data", "status" => 400, "token" => "");
     }
 }
