@@ -16,7 +16,7 @@ namespace Token {
         return $headers_encoded . '.' . $payload_encoded . '.' . $signature_encoded;
     }
 
-    function is_jwt_valid($jwt, $secret): bool {
+    function is_jwt_valid(string $jwt, string $secret): bool {
         // split the jwt
         $tokenParts = explode('.', $jwt);
         if (count($tokenParts) != 3) {
@@ -46,30 +46,30 @@ namespace Token {
         }
     }
 
-    function base64url_encode($data): string {
+    function base64url_encode(string $data): string {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
-    function encode($login, $id): string
+    function encode(string $login, string $id): string
     {
         $headers = array("alg" => "HS256", "typ" => "JWT");
         $payload = array("login" => $login, "id" => $id, "exp" => time() + 1800);
-        return "Bearer " . generate_jwt($headers, $payload, "bar-mitzvah");
+        return "Bearer " . generate_jwt($headers, $payload, "ngolo_kanteDU93");
     }
 
-    function is_valid_token($jwt): bool {
-        if(is_jwt_valid($jwt, "bar-mitzvah"))
+    function is_valid_token(string $jwt): bool {
+        if(is_jwt_valid($jwt, "ngolo_kanteDU93"))
             if(getEntraineur(getPayload($jwt)["id"]) != [])
                 return true;
         return false;
     }
 
-    function refreshJwt($jwt): string {
+    function refreshJwt(string $jwt): string {
         $payload = getPayload($jwt);
         return encode($payload["login"], $payload["id"]);
     }
 
-    function getPayload($token = ""): array {
+    function getPayload(string $token = ""): array {
         if ($token == "")
             $token = get_bearer_token();
         $tokenParts = explode('.', $token);

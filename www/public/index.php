@@ -3,7 +3,7 @@
 require_once "{$_SERVER["DOCUMENT_ROOT"]}/../libs/modele/Token.php";
 require_once "{$_SERVER["DOCUMENT_ROOT"]}/../libs/modele/Entraineur.php";
 
-use function Entraineur\checkEntraineur,Entraineur\getEntraineurByEmail,Entraineur\newEntraineur;
+use function Entraineur\checkEntraineur,Entraineur\existEntraineur,Entraineur\newEntraineur;
 use function Token\encode,Token\is_valid_token,Token\refreshJwt;
 
 header('Content-Type: application/json');
@@ -41,9 +41,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $message = array("response" => "Passwords do not match", "status" => 400);
             }
             else{
-                $user = getEntraineurByEmail($jsonBody["email"]);
-                if (!empty($user)) {
-                    $message = array("response" => "Username déjà pris", "status" => 400);
+                if (existEntraineur()) {
+                    $message = array("response" => "Un utilisateur existe déjà", "status" => 400);
                 } else if(empty(newEntraineur($jsonBody))){
                     $message = array("response" => "Erreur lors de la création de l'utilisateur", "status" => 400);
                 } else {
@@ -60,7 +59,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                 //generate the response and so the token
                 $token = encode($user["email"], $user["idEntraineur"]);
-                setcookie("token",$token,time() + 1800,"/");
                 $message = array("response" => "OK", "status" => 200, "token" => $token);
             }
         }
@@ -76,10 +74,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 //update the token (refresh exp time)
 elseif($_SERVER["REQUEST_METHOD"] == "PUT") {
     //if valid, refreshing token
-    if(is_valid_token($jsonBody["token"]) && checkAPIToken()){
-        $message = array("response" => "OK", "status" => 200, "token" => refreshJwt($jsonBody["token"]));
-    }else{
-        $message = array("response" => "Token is invalid", "status" => 405, "token"=>"");
+    if(isset($jsonBody["token"])) {
+        if (is_valid_token($jsonBody["token"]) && checkAPIToken()) {
+            $message = array("response" => "OK", "status" => 200, "token" => refreshJwt($jsonBody["token"]));
+        } else {
+            $message = array("response" => "Token is invalid", "status" => 405, "token" => "");
+        }
+    }
+    else {
+        var_dump($jsonBody);
+        $message = array("response" => "Please provide a proper data", "status" => 400, "token" => "");
     }
 }
 else if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {

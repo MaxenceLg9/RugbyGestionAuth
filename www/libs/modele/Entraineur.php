@@ -50,13 +50,11 @@ namespace Entraineur {
         return [];
     }
 
-    function getEntraineurByEmail(string $email): array
+    function existEntraineur(): bool
     {
         $pdo = creerConnexion();
-
-        $query = $pdo -> prepare("SELECT * FROM Entraineur WHERE email = :email");
-        $query->bindParam(":email",$email);
+        $query = $pdo -> prepare("SELECT * FROM Entraineur");
         $query->execute();
-        return $query -> fetchAll(PDO::FETCH_ASSOC);
+        return $query->rowCount() > 0;
     }
 }
